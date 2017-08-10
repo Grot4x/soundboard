@@ -5,6 +5,12 @@ import tkinter as tk
 from functools import partial
 from playsound import playsound
 
+Config = {}
+Config['X'] = 0
+Config['Y'] = 0
+Config['X_MAX'] = 5
+Config['Y_MAX'] = 5
+
 
 def checkOS():
     pass  # C:\
@@ -18,21 +24,27 @@ def playSound(filename):
 
 
 def genButton():
+    global Config
     root.filename = fd.askopenfilename(initialdir="~/Musik", title="Select file",
                                        filetypes=(("audio files", "*.mp3"), ("audio files", "*.wav")))
-    root.result = sd.askstring('Name', 'Enter a name for the button')
     if(len(root.filename) > 0):
-        button = tk.Button(root, text=root.result, command=partial(playSound, root.filename))
-        button.grid()
+        root.result = sd.askstring('Name', 'Enter a name for the button')
+        if(root.result is not None):
+            button = tk.Button(root, text=root.result, command=partial(playSound, root.filename))
+            button.grid(row=Config['X'], column=Config['Y'], padx=1)
+            if Config['Y'] > Config['Y_MAX']-2:
+                Config['Y'] = 0
+                Config['X'] += 1
+            else:
+                Config['Y'] += 1
 
 
 def main():
     menu = tk.Menu(root)
     root.config(menu=menu)
     menu.add_command(label="New", command=genButton)
-    w = tk.Label(root, text="Hello World")
-    w.grid()
-    root.geometry('400x400')
+    root.geometry('600x400')
+    root.wm_title("Soundboard")
     root.mainloop()
 
 
