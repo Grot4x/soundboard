@@ -27,6 +27,8 @@ def playSound(filename):
 
 def on_closing():
     print(json.dumps(Config))
+    f = open("config.json", 'w')
+    f.write(json.dumps(Config, indent=4))
     root.destroy()
 
 
