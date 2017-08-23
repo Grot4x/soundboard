@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 from tkinter import filedialog as fd
 from tkinter import simpledialog as sd
+from tkinter import messagebox as mb
 import tkinter as tk
 from functools import partial
-from playsound import playsound
-import pygame
+import os
+import pyaudio
+import wave
+import sys
 import json
 
 Config = {}
@@ -24,9 +27,26 @@ root = tk.Tk()
 
 
 def playSound(filename):
-    pygame.mixer.init()
-    pygame.mixer.music.load(filename)
-    pygame.mixer.music.play()
+    if os.path.isfile(filename):
+        CHUNK = 1024
+        wf = wave.open(filename, 'rb')
+        p = pyaudio.PyAudio()
+        stream = p.open(format=p.get_format_from_width(wf.getsampwidth()),
+                        channels=wf.getnchannels(),
+                        rate=wf.getframerate(),
+                        output=True)
+        data = wf.readframes(CHUNK)
+        while data != '':
+            stream.write(data)
+            data = wf.readframes(CHUNK)
+
+        stream.stop_stream()
+        stream.close()
+
+        p.terminate()
+    else:
+        mb.showerror("Error", "File not found: %s" % (filename))
+        # print("file not found")
 
 
 def on_opening():
@@ -34,15 +54,16 @@ def on_opening():
     try:
         Config = json.load(open("config.json", 'r'))
         for buttonID in Config['buttons']:
-            print()
-            button = tk.Button(root, text=Config['buttons'][buttonID]['name'], command=partial(playSound, Config['buttons'][buttonID]['file']))
-            button.grid(row=Config['buttons'][buttonID]['X'], column=Config['buttons'][buttonID]['Y'], padx=1)
+            button = tk.Button(root, text=Config['buttons'][buttonID]['name'], command=partial(
+                playSound, Config['buttons'][buttonID]['file']))
+            button.grid(row=Config['buttons'][buttonID]['X'],
+                        column=Config['buttons'][buttonID]['Y'], padx=1)
     except FileNotFoundError as e:
-        print("No Config")
+        mb.showinfo("Info", "No config file was found")
+        # print("No Config")
 
 
 def on_closing():
-    print(json.dumps(Config))
     f = open("config.json", 'w')
     f.write(json.dumps(Config, indent=4))
     root.destroy()
@@ -54,8 +75,9 @@ def genButton():
                                        filetypes=(("audio files", "*.mp3"), ("audio files", "*.wav")))
     if(len(root.filename) > 0):
         root.result = sd.askstring('Name', 'Enter a name for the button')
-        if(root.result is not None):
-            button = tk.Button(root, text=root.result, command=partial(playSound, root.filename))
+        if(root.result is not None and len(root.result) > 0):
+            button = tk.Button(root, text=root.result,
+                               command=partial(playSound, root.filename))
             button.grid(row=Config['X'], column=Config['Y'], padx=1)
             Config['buttons'][Config['ID']] = {}
             Config['buttons'][Config['ID']]['name'] = root.result
@@ -63,7 +85,7 @@ def genButton():
             Config['buttons'][Config['ID']]['Y'] = Config['Y']
             Config['buttons'][Config['ID']]['file'] = root.filename
             Config['ID'] += 1
-            if Config['Y'] > Config['Y_MAX']-2:
+            if Config['Y'] > Config['Y_MAX'] - 2:
                 Config['Y'] = 0
                 Config['X'] += 1
             else:
