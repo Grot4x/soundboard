@@ -4,11 +4,13 @@ from tkinter import simpledialog as sd
 from tkinter import messagebox as mb
 import tkinter as tk
 from functools import partial
+from threading import Thread, Event
 import os
 import pyaudio
 import wave
 import sys
 import json
+import time
 
 Config = {}
 Config['X'] = 0
@@ -24,29 +26,56 @@ def checkOS():
 
 
 root = tk.Tk()
+threads = []
+
+
+class AudioFile(Thread):
+    def __init__(self, filename):
+        Thread.__init__(self)
+        self._halt = Event()
+        self.filename = filename
+        self.p = pyaudio.PyAudio()
+        self.CHUNK = 1024
+        if os.path.isfile(self.filename):
+            self.wf = wave.open(self.filename, 'rb')
+            self.stream = self.p.open(format=self.p.get_format_from_width(self.wf.getsampwidth()),
+                                      channels=self.wf.getnchannels(),
+                                      rate=self.wf.getframerate(),
+                                      output=True)
+        else:
+            mb.showerror("Error", "File not found: %s" % (self.filename))
+            # print("file not found")
+
+    def run(self):
+        data = self.wf.readframes(self.CHUNK)
+        while data != b"" and not self._halt.is_set():
+            self.stream.write(data)
+            data = self.wf.readframes(self.CHUNK)
+        self.halt()
+
+    def halt(self):
+        self._halt.set()
+        self.stream.stop_stream()
+        self.stream.close()
+        self.p.terminate()
+        self.wf.close()
 
 
 def playSound(filename):
-    if os.path.isfile(filename):
-        CHUNK = 1024
-        wf = wave.open(filename, 'rb')
-        p = pyaudio.PyAudio()
-        stream = p.open(format=p.get_format_from_width(wf.getsampwidth()),
-                        channels=wf.getnchannels(),
-                        rate=wf.getframerate(),
-                        output=True)
-        data = wf.readframes(CHUNK)
-        while data != '':
-            stream.write(data)
-            data = wf.readframes(CHUNK)
-
-        stream.stop_stream()
-        stream.close()
-
-        p.terminate()
-    else:
-        mb.showerror("Error", "File not found: %s" % (filename))
-        # print("file not found")
+    global threads
+    for t in threads:
+        if not t.isAlive():
+            t.handled = True
+        else:
+            print("stopping old one")
+            t.halt()
+            t.join()
+            t.handled = True
+    threads = [t for t in threads if not t.handled]
+    print("Starting new one")
+    t = AudioFile(filename)
+    threads.append(t)
+    t.start()
 
 
 def on_opening():
